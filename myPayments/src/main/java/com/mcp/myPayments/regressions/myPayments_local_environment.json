@@ -1,0 +1,44 @@
+{
+  "id": "0c269af8-d559-45b5-b6d6-78eb39d29760",
+  "name": "myPayments Local",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1/service",
+      "enabled": true
+    },
+    {
+      "key": "customerId",
+      "value": "1",
+      "enabled": true
+    },
+    {
+      "key": "transactionId",
+      "value": "1",
+      "enabled": true
+    },
+    {
+      "key": "paymentId",
+      "value": "1",
+      "enabled": true
+    },
+    {
+      "key": "currency",
+      "value": "USD",
+      "enabled": true
+    },
+    {
+      "key": "category",
+      "value": "Retail",
+      "enabled": true
+    },
+    {
+      "key": "IDEMPOTENCY_KEY",
+      "value": "",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2025-08-10T01:31:31Z",
+  "_postman_exported_using": "ChatGPT"
+}
