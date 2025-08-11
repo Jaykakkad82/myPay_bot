@@ -1,0 +1,5 @@
+Steps to start this server
+
+- Go to the root directory i.e. mypay_bot
+- Export openAI key : export OPENAI_API_KEY=
+- Run server on port 8000 : uvicorn agent.app:app --reload --port 8000

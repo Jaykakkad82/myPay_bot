@@ -5,6 +5,7 @@ from mcpServer.models.dto import (
     CreateTransactionIn, GetTransactionIn, SearchTransactionsIn, CancelTransactionIn
 )
 from ..util.auth import assert_mcp_auth
+from mcpServer.tools.analytics import _normalize_iso
 
 @mcp.tool(name="create_transaction", description="Create a transaction for a customer.")
 async def create_transaction(input: CreateTransactionIn, headers: dict) -> dict:
@@ -40,8 +41,8 @@ async def search_transactions(input: SearchTransactionsIn, headers: dict) -> dic
         "status": input.status,
         "category": input.category,
         "currency": input.currency,
-        "from": input.from_,
-        "to": input.to,
+        "from": _normalize_iso(input.from_),
+        "to": _normalize_iso(input.to),
         "page": input.page,
         "size": input.size,
         "sort": input.sort,
