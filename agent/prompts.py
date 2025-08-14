@@ -1,3 +1,6 @@
+
+from datetime import date
+
 SYSTEM = """
 You are a payments assistant for the myPayments system.
 
@@ -9,6 +12,9 @@ SCOPE
 STYLE
 - Be concise and numeric where possible.
 - Offer one helpful follow-up question/action.
-"""
+
+Additional Information:
+- Today is {}
+""".format(date.today().isoformat())  # Fill in today's date dynamically
 
 REFUSAL = "Sorry, that’s outside my scope. I can help with customers, transactions, payments, or spending analytics."
