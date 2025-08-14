@@ -2,7 +2,7 @@ from mcpServer.runtime import mcp
 
 
 from mcpServer.payments_api.client import PaymentsApiClient
-from mcpServer.models.dto import SpendSummaryIn, SpendByCategoryIn, TimeSeriesIn
+from mcpServer.models.dto import SpendSummaryIn, SpendByCategoryIn, TimeSeriesIn, SpendByCategoryOut
 from mcpServer.util.auth import assert_mcp_auth
 from mcpServer.config import DEFAULT_FX_BASE
 from datetime import datetime
@@ -10,6 +10,8 @@ from datetime import datetime
 ISO_FMT = "%Y-%m-%dT%H:%M:%S"
 
 def _normalize_iso(dt: str, is_end: bool = False) -> str:
+    if dt is None:
+        return None
     dt = dt.strip()
     # If only a date is provided, expand to start/end of day
     if len(dt) == 10 and dt.count("-") == 2:  # 'YYYY-MM-DD'
@@ -33,6 +35,7 @@ def _normalize_iso(dt: str, is_end: bool = False) -> str:
     raise ValueError(f"Invalid datetime format: {dt}. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS]")
 
 
+
 @mcp.tool(name="spend_summary", description="Summarize completed spend for a customer in a time window.")
 async def spend_summary(input: SpendSummaryIn, headers: dict) -> dict:
     assert_mcp_auth(headers)
@@ -48,13 +51,40 @@ async def spend_summary(input: SpendSummaryIn, headers: dict) -> dict:
     finally:
         await api.close()
 
-@mcp.tool(name="spend_by_category", description="Category-wise spend totals for a customer.")
+@mcp.tool(name="spend_by_category", 
+          description="Category-wise spend totals for a customer.", 
+          output_schema=SpendByCategoryOut.model_json_schema())
 async def spend_by_category(input: SpendByCategoryIn, headers: dict) -> dict:
     assert_mcp_auth(headers)
+    print("Request received with parameters: ", input)
     api = PaymentsApiClient()
     params = {"customerId": input.customerId, "from": _normalize_iso(input.from_), "to": _normalize_iso(input.to)}
     try:
-        return await api.spend_by_category(params)
+        raw = await api.spend_by_category(params)  # upstream may return a list
+        print(raw)
+        # Normalize to a dict for FastMCP
+        if isinstance(raw, dict):
+            items = raw.get("items", [])
+        else:
+            items = raw or []
+
+        normalized = {
+            "customerId": input.customerId,
+            "from_": params["from"],
+            "to": params["to"],
+            "baseCurrency": DEFAULT_FX_BASE,
+            "items": [
+            {
+                "category": r.get("category", ""),
+                "amount": float(r.get("totalAmount", 0) or 0),
+                "transactionCount": r.get("transactionCount", 0),
+                "currency": r.get("currency", DEFAULT_FX_BASE),
+            }
+            for r in items
+            ],
+        }
+        print("Normalized spend by category:", normalized)
+        return normalized
     finally:
         await api.close()
 

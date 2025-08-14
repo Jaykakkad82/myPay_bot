@@ -35,6 +35,7 @@ async def get_transaction(input: GetTransactionIn, headers: dict) -> dict:
 @mcp.tool(name="search_transactions", description="Search transactions with filters and pagination.")
 async def search_transactions(input: SearchTransactionsIn, headers: dict) -> dict:
     assert_mcp_auth(headers)
+    print("Request received with parameters: ", input)
     api = PaymentsApiClient()
     params = {
         "customerId": input.customerId,

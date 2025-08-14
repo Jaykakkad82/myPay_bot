@@ -87,3 +87,15 @@ class TimeSeriesIn(BaseModel):
     from_: str = Field(..., alias="from")
     to: str
     category: Optional[str] = None
+
+class CategoryItem(BaseModel):
+    category: str
+    amount: float
+    currency: str
+
+class SpendByCategoryOut(BaseModel):
+    customerId: int
+    from_: str
+    to: str
+    baseCurrency: str
+    items: list[CategoryItem] = Field(default_factory=list)
