@@ -8,6 +8,11 @@ from .lc_tools import (
     make_spend_summary_tool,
     make_spend_by_category_tool,
     make_search_transactions_tool,
+    make_get_customer_tool,
+    make_make_payment_tool,
+    make_get_balance_tool,
+    make_list_accounts_tool,
+    make_get_transaction_detail_tool,
 )
 
 def build_agent() -> AgentExecutor:
@@ -15,7 +20,13 @@ def build_agent() -> AgentExecutor:
         make_spend_summary_tool(),
         make_spend_by_category_tool(),
         make_search_transactions_tool(),
-        # TODO: add the rest of your MCP tools similarly (get_customer, make_payment, etc.)
+        # Add more MCP tools below
+        make_get_customer_tool(),
+        make_make_payment_tool(),
+        make_get_balance_tool(),
+        make_list_accounts_tool(),
+        make_get_transaction_detail_tool(),
+        # Add any additional tools as needed
     ]
 
     prompt = ChatPromptTemplate.from_messages([
