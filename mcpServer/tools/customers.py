@@ -16,10 +16,13 @@ async def create_customer(input: CreateCustomerIn, headers: dict) -> dict:
 
 @mcp.tool(name="get_customer", description="Fetch a customer by id.")
 async def get_customer(input: GetCustomerIn, headers: dict) -> dict:
+    print("Request received with parameters: ", input)
     assert_mcp_auth(headers)
     api = PaymentsApiClient()
     try:
-        return await api.get_customer(input.id)
+        result = await api.get_customer(input.id)
+        print("Fetched customer details: ", result)
+        return result
     finally:
         await api.close()
 

@@ -73,13 +73,23 @@ def make_search_transactions_tool():
     )
 
 class GetCustomerIn(BaseModel):
-    customerId: int = Field(..., ge=1)
+    # allow using either alias or field name
+    model_config = ConfigDict(populate_by_name=True)
+    # accept "customerId" or "id" on input; serialize as "id"
+    customerId: int = Field(
+        ..., 
+        alias="id",
+        validation_alias=AliasChoices("id", "customerId")
+    )
 
 def make_get_customer_tool():
     async def _run(**kwargs):
         data = GetCustomerIn.model_validate(kwargs)
+        payload = data.model_dump(by_alias=True)
+    
         async with MCPBridge(MCP_URL) as mcp:
-            return await mcp.call("get_customer", data.model_dump(by_alias=True), headers=_headers())
+            print("----Payload ----->", payload)
+            return await mcp.call("get_customer", payload, headers=_headers())
     return StructuredTool.from_function(
         coroutine=_run,
         name="get_customer",
