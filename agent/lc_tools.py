@@ -97,11 +97,46 @@ def make_get_customer_tool():
         args_schema=GetCustomerIn,
     )
 
+class CreateCustomerIn(BaseModel):
+    fullName: str
+    email: str
+    phoneNumber: Optional[str]
+
+def make_create_customer_tool():
+    async def _run(**kwargs):
+        data = CreateCustomerIn.model_validate(kwargs)
+        async with MCPBridge(MCP_URL) as mcp:
+            return await mcp.call("create_customer", data.model_dump(by_alias=True), headers=_headers())
+    return StructuredTool.from_function(
+        coroutine=_run,
+        name="create_customer",
+        description="Create a new customer.",
+        args_schema=CreateCustomerIn,
+    )
+
+
+# Payments -> make_payment, get_payment, retry_payment, fail_payment, get_payment_by_transaction
+
+
+class GetPaymentIn(BaseModel):
+    id: int = Field(..., ge=1)
+
+def make_get_payment_tool():
+    async def _run(**kwargs):
+        data = GetPaymentIn.model_validate(kwargs)
+        async with MCPBridge(MCP_URL) as mcp:
+            return await mcp.call("get_payment", data.model_dump(by_alias=True), headers=_headers())
+    return StructuredTool.from_function(
+        coroutine=_run,
+        name="get_payment",
+        description="Get payment details by paymentId.",
+        args_schema=GetPaymentIn,
+    )
+
 class MakePaymentIn(BaseModel):
-    fromAccountId: int = Field(..., ge=1)
-    toAccountId: int = Field(..., ge=1)
-    amount: float = Field(..., gt=0)
-    currency: str = Field(...)
+    transactionId: int = Field(..., ge=1)
+    method: str
+    idempotencyKey: Optional[str] = None
 
 def make_make_payment_tool():
     async def _run(**kwargs):
@@ -115,47 +150,86 @@ def make_make_payment_tool():
         args_schema=MakePaymentIn,
     )
 
-class GetBalanceIn(BaseModel):
-    accountId: int = Field(..., ge=1)
+# class MakePaymentIn(BaseModel):
+#     fromAccountId: int = Field(..., ge=1)
+#     toAccountId: int = Field(..., ge=1)
+#     amount: float = Field(..., gt=0)
+#     currency: str = Field(...)
 
-def make_get_balance_tool():
-    async def _run(**kwargs):
-        data = GetBalanceIn.model_validate(kwargs)
-        async with MCPBridge(MCP_URL) as mcp:
-            return await mcp.call("get_balance", data.model_dump(by_alias=True), headers=_headers())
-    return StructuredTool.from_function(
-        coroutine=_run,
-        name="get_balance",
-        description="Get account balance by accountId.",
-        args_schema=GetBalanceIn,
-    )
+# def make_make_payment_tool():
+#     async def _run(**kwargs):
+#         data = MakePaymentIn.model_validate(kwargs)
+#         async with MCPBridge(MCP_URL) as mcp:
+#             return await mcp.call("make_payment", data.model_dump(by_alias=True), headers=_headers())
+#     return StructuredTool.from_function(
+#         coroutine=_run,
+#         name="make_payment",
+#         description="Make a payment from one account to another. Use keys: fromAccountId, toAccountId, amount, currency.",
+#         args_schema=MakePaymentIn,
+#     )
 
-class ListAccountsIn(BaseModel):
-    customerId: int = Field(..., ge=1)
+# class GetBalanceIn(BaseModel):
+#     accountId: int = Field(..., ge=1)
 
-def make_list_accounts_tool():
-    async def _run(**kwargs):
-        data = ListAccountsIn.model_validate(kwargs)
-        async with MCPBridge(MCP_URL) as mcp:
-            return await mcp.call("list_accounts", data.model_dump(by_alias=True), headers=_headers())
-    return StructuredTool.from_function(
-        coroutine=_run,
-        name="list_accounts",
-        description="List all accounts for a customerId.",
-        args_schema=ListAccountsIn,
-    )
+# def make_get_balance_tool():
+#     async def _run(**kwargs):
+#         data = GetBalanceIn.model_validate(kwargs)
+#         async with MCPBridge(MCP_URL) as mcp:
+#             return await mcp.call("get_balance", data.model_dump(by_alias=True), headers=_headers())
+#     return StructuredTool.from_function(
+#         coroutine=_run,
+#         name="get_balance",
+#         description="Get account balance by accountId.",
+#         args_schema=GetBalanceIn,
+#     )
+
+# class ListAccountsIn(BaseModel):
+#     customerId: int = Field(..., ge=1)
+
+# def make_list_accounts_tool():
+#     async def _run(**kwargs):
+#         data = ListAccountsIn.model_validate(kwargs)
+#         async with MCPBridge(MCP_URL) as mcp:
+#             return await mcp.call("list_accounts", data.model_dump(by_alias=True), headers=_headers())
+#     return StructuredTool.from_function(
+#         coroutine=_run,
+#         name="list_accounts",
+#         description="List all accounts for a customerId.",
+#         args_schema=ListAccountsIn,
+#     )
 
 class GetTransactionDetailIn(BaseModel):
-    transactionId: int = Field(..., ge=1)
+    id: int = Field(..., ge=1)
 
 def make_get_transaction_detail_tool():
     async def _run(**kwargs):
         data = GetTransactionDetailIn.model_validate(kwargs)
         async with MCPBridge(MCP_URL) as mcp:
-            return await mcp.call("get_transaction_detail", data.model_dump(by_alias=True), headers=_headers())
+            return await mcp.call("get_transaction", data.model_dump(by_alias=True), headers=_headers())
     return StructuredTool.from_function(
         coroutine=_run,
         name="get_transaction_detail",
         description="Get details for a transaction by transactionId.",
         args_schema=GetTransactionDetailIn,
+    )
+
+#create_transaction
+class CreateTransactionIn(BaseModel):
+    customerId: int = Field(..., ge=1)
+    amount: float = Field(..., ge=0)
+    currency: str
+    category: str
+    description: Optional[str] = None
+    idempotencyKey: Optional[str] = None
+
+def make_create_transaction_tool():
+    async def _run(**kwargs):
+        data = CreateTransactionIn.model_validate(kwargs)
+        async with MCPBridge(MCP_URL) as mcp:
+            return await mcp.call("create_transaction", data.model_dump(by_alias=True), headers=_headers())
+    return StructuredTool.from_function(
+        coroutine=_run,
+        name="create_transaction",
+        description="Create a new transaction.",
+        args_schema=CreateTransactionIn,
     )
