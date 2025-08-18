@@ -1,0 +1,48 @@
+
+***** Basic questions ********
+
+lets create a new customer with name JK KJ,  email as dummy.email@test.com and phone number 98789098e number 
+
+get me details of customer ID 53
+
+get payment details with payment id 1
+
+get transaction with ID 1
+
+
+******* Making two API calls 
+
+Get payment and transaction both with ID 1
+
+Get all failed transactions for customer ID 41
+
+
+********* Multiple API calls:
+Get all failed transactions for customer ID between 1 and 5
+
+Get all failed transactions for customer ID between 1 and 5 and also find corresponding payment such that paymentID matches transactionID
+
+
+******** Questions sequence that uses context
+give me transaction details with ID 3
+can you provide me with corresponding payment detail
+Give me customer details related to this transaction
+Give me customer details related to customer ID xx (to cross check)
+
+
+**** Workflow based query
+
+create transaction for customer 50 for amount of Rs 200 , description as electricity bill and category as utilities
+
+create payment for this transaction ID using method credit card
+
+show me the transaction 
+
+
+*** Workflow in one go (multiple API calls):
+
+create transaction for customer 48 for amount of USD 800 , description as water bill and category as utilities. Also create a corresponding payment and then show me the payment and transaction details
+
+
+**** General Difficult questions
+for customers 10..25 get Pending transactions last 90 days and attach payments if any

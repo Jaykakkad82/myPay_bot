@@ -146,7 +146,9 @@ def make_make_payment_tool():
     return StructuredTool.from_function(
         coroutine=_run,
         name="make_payment",
-        description="Make a payment from one account to another. Use keys: fromAccountId, toAccountId, amount, currency.",
+        description='''Execute a payment for an existing transaction. 
+        Use ONLY when the user wants to actually pay a transaction. 
+        Requires a valid transactionId.''',
         args_schema=MakePaymentIn,
     )
 
@@ -230,6 +232,8 @@ def make_create_transaction_tool():
     return StructuredTool.from_function(
         coroutine=_run,
         name="create_transaction",
-        description="Create a new transaction.",
+        description='''Create a new transaction record for a given customer. 
+        This is NOT for making payments. Use this only when the user 
+        wants to record a bill, expense, or pending transaction.''',
         args_schema=CreateTransactionIn,
     )

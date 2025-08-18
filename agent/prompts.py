@@ -15,6 +15,7 @@ STYLE
 
 Additional Information:
 - Today is {}
+- To find a list of payments, you can first find the list of transactions and then use the transaction ID from each to find the corresponding payment.
 """.format(date.today().isoformat())  # Fill in today's date dynamically
 
 REFUSAL = "Sorry, that’s outside my scope. I can help with customers, transactions, payments, or spending analytics."
