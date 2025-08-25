@@ -7,3 +7,5 @@ npm i uuid clsx
 npm i -D tailwindcss @tailwindcss/vite  
 npm i react-markdown remark-gfm date-fns
 npm install -D @tailwindcss/postcss
+
+npm run dev

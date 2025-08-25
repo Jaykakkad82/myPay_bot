@@ -17,7 +17,7 @@ function StatusPill({ ok }: { ok: boolean | null }) {
 }
 
 export default function App() {
-  const { sessionId, messages, busy, error, send, clear, scrollRef } = useChat();
+  const { sessionId, messages, busy, error, send, clear, scrollRef, approvePending, denyPending } = useChat();
   const [ok, setOk] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -58,7 +58,9 @@ export default function App() {
                 </ul>
               </div>
             )}
-            {messages.map((m) => <MessageBubble key={m.id} m={m} />)}
+            {messages.map((m) => <MessageBubble key={m.id} m={m} 
+            onApprove={approvePending}
+            onDeny={denyPending}/>)}
             {busy && (
               <div className="text-xs opacity-70">
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-indigo-500 mr-2" />

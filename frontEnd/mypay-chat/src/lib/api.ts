@@ -1,32 +1,118 @@
+
+// ---------- Types ----------
+export type TraceStep = { node: string; status: string; details?: any };
+export type ToolCall = { tool: string; args: any };
+
+export type AssistantMessage = {
+  id: string;
+  role: "assistant";
+  content: string; // markdown
+  trace?: TraceStep[];
+  tool_calls?: ToolCall[];
+  pending_approval?: { reason: string; args: any; approval_id: string } | null;
+  ts: string | number; // server may return ISO or epoch; UI handles both
+  resume?: any;
+};
+
+// Optional legacy types (if any old code still imports them)
 export type ChatRequest = {
-  sessionId: string;
+  sessionId?: string;
   message: string;
-  customerId?: number;
-  from?: string;
-  to?: string;
-  currency?: string;
+  extras?: {
+    customerId?: number;
+    from?: string;
+    to?: string;
+    currency?: string;
+  };
 };
+export type ChatResponse = { answer: string }; // legacy only
 
-export type ChatResponse = {
-  answer: string;
-};
+// ---------- Base URL handling ----------
+const RAW_BASE: string =
+  (import.meta as any)?.env?.VITE_AGENT_API_URL ??
+  ""; // empty string => same-origin
 
-const BASE = import.meta.env.VITE_AGENT_API_URL || "http://localhost:8000";
+// join helper to avoid // issues
+const joinURL = (base: string, path: string) =>
+  `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 
-export async function sendChat(req: ChatRequest): Promise<ChatResponse> {
-  const res = await fetch(`${BASE}/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+// If RAW_BASE is empty, use same-origin relative paths.
+// If you prefer explicit localhost fallback, set RAW_BASE || "http://localhost:8000"
+const BASE = RAW_BASE || "http://localhost:8010";
+
+// Common fetch wrapper
+async function apiFetch<T>(
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  const url = BASE ? joinURL(BASE, path) : path;
+  const res = await fetch(url, {
+    // include credentials if your backend uses cookies/sessions:
+    // credentials: "include",
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(init?.headers || {}),
+    },
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Chat API ${res.status}: ${text}`);
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText} – ${text}`.trim());
   }
-  return res.json();
+  console.log("API Fetch: ", url, init);
+  return res.json() as Promise<T>;
 }
 
+// ---------- API calls ----------
 export async function health(): Promise<{ ok: boolean }> {
-  const res = await fetch(`${BASE}/health`);
-  return res.json();
+  try {
+    // Works with either absolute BASE or same-origin
+    return await apiFetch<{ ok: boolean }>("/health");
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function sendChat(
+  text: string,
+  extras?: { customerId?: number; from?: string; to?: string; currency?: string },
+  sessionId?: string
+): Promise<AssistantMessage> {
+  const body: ChatRequest = {
+    sessionId,
+    message: text,
+    extras,
+  };
+  return apiFetch<AssistantMessage>("/chat", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function approve(
+  approvalId: string,
+  lastState: any
+): Promise<AssistantMessage> {
+  return apiFetch<AssistantMessage>("/workflow/approval", {
+    method: "POST",
+    body: JSON.stringify({
+      approvalId,
+      decision: "APPROVE",
+      lastState,
+    }),
+  });
+}
+
+export async function deny(
+  approvalId: string,
+  lastState: any
+): Promise<AssistantMessage> {
+  return apiFetch<AssistantMessage>("/workflow/approval", {
+    method: "POST",
+    body: JSON.stringify({
+      approvalId,
+      decision: "DENY",
+      lastState,
+    }),
+  });
 }

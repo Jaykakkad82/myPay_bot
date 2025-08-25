@@ -6,10 +6,12 @@ from mcpServer.util.auth import assert_mcp_auth
 
 @mcp.tool(name="create_customer", description="Create a customer if it does not exist by email; returns existing if already present.")
 async def create_customer(input: CreateCustomerIn, headers: dict) -> dict:
+    print("create customer input: ", input)
     assert_mcp_auth(headers)
     api = PaymentsApiClient()
     try:
         result = await api.create_customer(input.model_dump(by_alias=True, exclude_none=True))
+        print("Created customer: ", result)
         return result
     finally:
         await api.close()
