@@ -133,6 +133,25 @@ def make_get_payment_tool():
         args_schema=GetPaymentIn,
     )
 
+class GetPaymentByTransactionIn(BaseModel):
+    transactionId: int = Field(..., ge=1)
+
+def make_get_payment_by_transaction_tool():
+    async def _run(**kwargs):
+        data = GetPaymentByTransactionIn.model_validate(kwargs)
+        async with MCPBridge(MCP_URL) as mcp:
+            return await mcp.call(
+                "get_payment_by_transaction",
+                data.model_dump(by_alias=True),
+                headers=_headers()
+            )
+    return StructuredTool.from_function(
+        coroutine=_run,
+        name="get_payment_by_transaction",
+        description="Get payment details by transactionId.",
+        args_schema=GetPaymentByTransactionIn,
+    )
+
 class MakePaymentIn(BaseModel):
     transactionId: int = Field(..., ge=1)
     method: str

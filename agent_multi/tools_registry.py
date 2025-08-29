@@ -10,6 +10,7 @@ from agent.lc_tools import (
     make_create_customer_tool,
     make_create_transaction_tool,
     make_make_payment_tool,
+    make_get_payment_by_transaction_tool,
 )
 
 def build_read_only_tools() -> List:
@@ -21,6 +22,7 @@ def build_read_only_tools() -> List:
         make_get_customer_tool(),
         make_get_transaction_detail_tool(),
         make_get_payment_tool(),
+        make_get_payment_by_transaction_tool() 
     ]
 
 def build_write_tools() -> List:

@@ -19,7 +19,7 @@ _OP_CANDIDATES: Dict[str, List[str]] = {
     "transactions.get":   ["get_transaction_detail"],
     "analytics.spend":    ["spend_summary"],
     "analytics.category": ["spend_by_category"],
-    "payments.get":       ["get_payment"],
+    "payments.get":       ["get_payment", "get_payment_by_transaction"],
 }
 
 def _tools_for_operation(op: str):

@@ -19,6 +19,47 @@ html {
 *::-webkit-scrollbar-thumb { background: rgba(0,0,0,.25); border-radius: 999px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
+/* Typography + comfortable reading */
+.prose { line-height: 1.7; }
+.prose p, .prose li { line-height: 1.7; }
+body { font-variant-numeric: tabular-nums; }
+
+/* Markdown tables rendered inside MessageBubble */
+.prose table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: .5rem 0;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.dark .prose table { border-color: rgba(255,255,255,.08); }
+
+.prose thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(255,255,255,.75);
+  backdrop-filter: saturate(180%) blur(6px);
+  font-weight: 600;
+}
+.dark .prose thead th { background: rgba(24,24,27,.7); }
+
+.prose th, .prose td {
+  padding: .5rem .6rem;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  vertical-align: middle;
+}
+.dark .prose th, .dark .prose td { border-color: rgba(255,255,255,.08); }
+
+.prose tbody tr:nth-child(odd) { background: rgba(0,0,0,.02); }
+.dark .prose tbody tr:nth-child(odd) { background: rgba(255,255,255,.03); }
+
+/* Make last column wrap nicely; keep numbers aligned */
+.prose td, .prose th { text-align: left; }
+.prose td:nth-last-child(1) { white-space: normal; word-break: break-word; }
 
 
 
