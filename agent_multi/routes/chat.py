@@ -1,14 +1,14 @@
 # agent_multi/routes/chat.py
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import uuid
-
 from fastapi.encoders import jsonable_encoder
 
 from ..workflow.graph import build_multi_agent_graph
-from ..workflow.sessions import SessionMemory  # per-session memory
+from ..workflow.sessions import SessionMemory
+from ..runtime.session_store import SessionStore
 
 graph = build_multi_agent_graph()
 router = APIRouter()
@@ -17,13 +17,11 @@ router = APIRouter()
 class ChatIn(BaseModel):
     sessionId: Optional[str] = None
     message: str
-    extras: Optional[Dict[str, Any]] = None  # {customerId, from, to, currency}
+    extras: Optional[Dict[str, Any]] = None
 
 
 def _compose_input(message: str, extras: Optional[Dict[str, Any]]) -> str:
-    """
-    Attach structured hints for the planner/agents (keeps your existing UI extras).
-    """
+    """Render a contextual banner that the graph/agents can parse, but store raw user text in memory."""
     if not extras:
         return message
     hints = []
@@ -35,23 +33,50 @@ def _compose_input(message: str, extras: Optional[Dict[str, Any]]) -> str:
         hints.append(f'to={extras["to"]}')
     if extras.get("currency"):
         hints.append(f'fxBase={extras["currency"]}')
-    if hints:
-        return f"{message}\n\n[context: " + ", ".join(hints) + "]"
-    return message
+    return message if not hints else f"{message}\n\n[context: " + ", ".join(hints) + "]"
+
+
+def _approx_tokens(*texts: str) -> int:
+    """Very rough heuristic: 1 token ≈ 4 chars."""
+    total = 0
+    for t in texts:
+        if isinstance(t, str):
+            total += len(t)
+        else:
+            total += len(str(t))
+    return max(1, total // 4)
+
+
+def _compact_history_by_chars(messages: List[Dict[str, Any]], max_chars: int = 8000) -> List[Dict[str, Any]]:
+    """
+    Keep the most recent turns up to ~max_chars of total content.
+    Messages are expected as {role, content, ts?}.
+    """
+    if not messages:
+        return []
+    acc: List[Dict[str, Any]] = []
+    used = 0
+    # walk from the end (most recent) backwards
+    for msg in reversed(messages):
+        c = msg.get("content") or ""
+        length = len(c) if isinstance(c, str) else len(str(c))
+        if used + length > max_chars and acc:
+            break
+        acc.append(msg)
+        used += length
+    acc.reverse()
+    return acc
 
 
 def _format_message_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Shape the assistant turn for the UI (summary first, fallback to raw JSON),
-    and include a resume blob so approvals can continue the graph.
-    """
-    # Prefer the summarizer’s text
+    # Prefer summarizer text if provided
     if isinstance(state.get("result"), dict) and "summary" in state["result"]:
         content = state["result"]["summary"]
     else:
-        content = "Here’s what I found:\n\n```json\n" + str(state.get("result")) + "\n```"
+        result_str = jsonable_encoder(state.get("result"))
+        content = f"Here’s what I found:\n\n```json\n{result_str}\n```"
 
-    # Pending approval banner (if any)
+    # Pending approval structure for the UI banner
     pending = None
     if state.get("status") == "AWAITING_APPROVAL":
         p = state.get("pending_approval") or {}
@@ -69,9 +94,7 @@ def _format_message_from_state(state: Dict[str, Any]) -> Dict[str, Any]:
         "tool_calls": state.get("tool_calls") or [],
         "pending_approval": pending,
         "ts": datetime.now(tz=timezone.utc).isoformat(),
-        # Client uses this to resume on Approve/Reject
         "resume": jsonable_encoder(state),
-        # Optional: if you ever emit notifications in the graph
         "notifications": state.get("notifications") or [],
     }
 
@@ -82,43 +105,55 @@ async def health():
 
 
 @router.post("/chat")
-async def chat(body: ChatIn):
-    """
-    - Keep per-session chat history (user/assistant turns) with SessionMemory
-    - Pass history + scratch into the graph
-    - Persist last_result back to scratch for follow-ups
-    - Return a UI-friendly assistant message + resume blob
-    """
-    # 1) Resolve session and compose the model input
-    sid = body.sessionId or "default"
-    user_text = (body.message or "").strip()
-    composed = _compose_input(user_text, body.extras)
+async def chat(body: ChatIn, request: Request):
+    # --- Require server session (aligns with your new SessionStore) ---
+    sid = body.sessionId or request.headers.get("X-Session-Id")
+    if not sid:
+        raise HTTPException(status_code=401, detail="missing sessionId")
+    if not SessionStore.get_session(sid):
+        raise HTTPException(status_code=401, detail="unknown session; call /session/start")
 
-    # 2) Load session memory (history + scratch) and append the user turn
-    mem = SessionMemory.get(sid)
-    history = mem["messages"]                    # list of {role, content}
-    SessionMemory.append(sid, "user", user_text) # store raw user text (not composed)
+    # --- Per-request limit check ---
+    ok, meta = SessionStore.enforce_request(sid)
+    if not ok:
+        raise HTTPException(status_code=429, detail=meta)
 
-    # 3) Build the initial graph state
+    # --- Load session memory and append the user turn (store RAW user message) ---
+    mem = SessionMemory.get(sid)  # expected shape: { "messages": [...], ... }
+    SessionMemory.append(sid, role="user", content=body.message)
+
+    # --- Build the text sent to the graph (user text + optional [context: ...]) ---
+    user_text_for_graph = _compose_input(body.message, body.extras)
+
+    # --- Compact history before invoking the graph (char-based; swap for tokenizer later) ---
+    history = _compact_history_by_chars(mem.get("messages", []), max_chars=8000)
+
+    # --- Invoke graph with history and extras (so notifier/compliance can use them) ---
     initial = {
-        "input": composed,                       # includes [context: ...] if extras
-        "messages": history,                     # orchestrator/agents can read conversation so far
-        "scratch": SessionMemory.get_scratch(sid),
+        "input": user_text_for_graph,
+        "messages": history,       # plain list of {role, content, ts?}
         "trace": [],
         "tool_calls": [],
+        "extras": body.extras or {},
     }
-
-    # 4) Run the graph
     state = await graph.ainvoke(initial)
 
-    # 5) Persist useful scratch for next turns (e.g., last_result, last ids)
-    scratch = state.get("scratch") or {}
-    if "last_result" in scratch:
-        SessionMemory.put_scratch(sid, "last_result", scratch["last_result"])
+    # --- Enforce tool-call and token limits after execution (so we have counts) ---
+    tool_calls = state.get("tool_calls") or []
+    if tool_calls:
+        ok, meta = SessionStore.enforce_tools(sid, len(tool_calls))
+        if not ok:
+            raise HTTPException(status_code=429, detail=meta)
 
-    # 6) Format assistant turn and append to memory
+    # Approx tokens for this turn: input + assistant content
     msg = _format_message_from_state(state)
-    SessionMemory.append(sid, "assistant", msg["content"])
+    approx = _approx_tokens(body.message, msg["content"])
+    ok, meta = SessionStore.enforce_tokens(sid, approx)
+    if not ok:
+        raise HTTPException(status_code=429, detail=meta)
 
-    # 7) Return to UI
-    return msg
+    # --- Persist assistant turn in session memory ---
+    SessionMemory.append(sid, role="assistant", content=msg["content"])
+
+    # --- Return assistant payload (echo sessionId so UI can keep using it) ---
+    return {**msg, "sessionId": sid}
