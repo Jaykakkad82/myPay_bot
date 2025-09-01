@@ -27,10 +27,10 @@ def get_agent():
     # You can switch this to a singleton if you prefer.
     return build_agent()
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat")
 async def chat(req: ChatRequest, agent=Depends(get_agent)):
     if not is_in_scope(req.message):
-        return ChatResponse(answer=REFUSAL)
+        return { "content": REFUSAL }
 
     # (Optional) Inline context hint
     context = f"(Context: customerId={req.customerId}) " if req.customerId else ""
@@ -53,4 +53,6 @@ async def chat(req: ChatRequest, agent=Depends(get_agent)):
     history.append(HumanMessage(content=req.message))
     history.append(AIMessage(content=answer))
 
-    return ChatResponse(answer=answer)
+    return { "content": answer}
+
+# ChatResponse(answer=answer)

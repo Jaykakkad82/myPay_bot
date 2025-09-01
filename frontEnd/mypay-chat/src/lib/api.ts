@@ -39,6 +39,7 @@ const joinURL = (base: string, path: string) =>
 // If RAW_BASE is empty, use same-origin relative paths.
 // If you prefer explicit localhost fallback, set RAW_BASE || "http://localhost:8000"
 const BASE = RAW_BASE || "http://localhost:8010";
+// const BASE = "http://localhost:8000";
 
 // Common fetch wrapper
 async function apiFetch<T>(
