@@ -31,22 +31,22 @@ A production-leaning **agentic demo** for API products. It showcases:
 ## 🏗️ Architecture (High Level)
 
 ```mermaid
-graph TD
-  U[User] --> FE[FrontEnd (React)]
-  FE --> API[agent_multi (FastAPI)]
-  API --> ORCH[Orchestrator]
-  ORCH --> DATA[Data Agent]
-  ORCH --> EXEC[Execution Agent]
-  EXEC --> COMP[Compliance]
-  EXEC --> NOTIF[Notifier (SES)]
-  DATA --> MCP[MCP Server]
-  EXEC --> MCP
-  MCP --> SB[Spring Boot API]
-  ORCH --> SUM[Summarizer]
-  DATA --> SUM
-  EXEC --> SUM
-  API --> DDB[(DynamoDB)]
-  FE -.-> DDB
+graph TD;
+  U[User] --> FE[FrontEnd (React)];
+  FE --> API[agent_multi (FastAPI)];
+  API --> ORCH[Orchestrator];
+  ORCH --> DATA[Data Agent];
+  ORCH --> EXEC[Execution Agent];
+  EXEC --> COMP[Compliance];
+  EXEC --> NOTIF[Notifier (SES)];
+  DATA --> MCP[MCP Server];
+  EXEC --> MCP;
+  MCP --> SB[Spring Boot API];
+  ORCH --> SUM[Summarizer];
+  DATA --> SUM;
+  EXEC --> SUM;
+  API --> DDB[(DynamoDB)];
+  FE -.-> DDB;
 
   classDef dim fill:#f6f6f7,stroke:#d1d5db,color:#111;
   classDef core fill:#eef2ff,stroke:#818cf8,color:#111;
