@@ -54,7 +54,7 @@ graph TD;
   classDef integ fill:#ecfeff,stroke:#06b6d4,color:#111;
   class API,FE dim;
   class ORCH,DATA,EXEC,COMP,NOTIF,SUM core;
-  class MCP,SB,DDB integ;
+  class MCP,SB,DDB,APPDB integ;
 ```
 
 ---
