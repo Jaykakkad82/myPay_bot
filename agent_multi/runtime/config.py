@@ -8,23 +8,23 @@ DDB_ENDPOINT = os.getenv("DDB_ENDPOINT","http://localhost:8000")
 
 # Tier limit templates (tune as you like)
 ANON_LIMITS = {
-    "requests_per_min": int(os.getenv("LIMIT_ANON_REQ_PER_MIN", "12")),
-    "tools_per_min":    int(os.getenv("LIMIT_ANON_TOOL_PER_MIN", "12")),
-    "tokens_per_day":   int(os.getenv("LIMIT_ANON_TOK_PER_DAY", "60000")),
+    "requests_per_min": int(os.getenv("LIMIT_ANON_REQ_PER_MIN", "5")),
+    "tools_per_min":    int(os.getenv("LIMIT_ANON_TOOL_PER_MIN", "10")),
+    "tokens_per_day":   int(os.getenv("LIMIT_ANON_TOK_PER_DAY", "15000")),
 }
 ELEV_LIMITS = {
-    "requests_per_min": int(os.getenv("LIMIT_ELEV_REQ_PER_MIN", "60")),
-    "tools_per_min":    int(os.getenv("LIMIT_ELEV_TOOL_PER_MIN", "60")),
-    "tokens_per_day":   int(os.getenv("LIMIT_ELEV_TOK_PER_DAY", "300000")),
+    "requests_per_min": int(os.getenv("LIMIT_ELEV_REQ_PER_MIN", "7")),
+    "tools_per_min":    int(os.getenv("LIMIT_ELEV_TOOL_PER_MIN", "20")),
+    "tokens_per_day":   int(os.getenv("LIMIT_ELEV_TOK_PER_DAY", "100000")),
 }
 ADMIN_LIMITS = {
-    "requests_per_min": math.inf,
-    "tools_per_min":    math.inf,
-    "tokens_per_day":   math.inf,
+    "requests_per_min": 25,
+    "tools_per_min":    100,
+    "tokens_per_day":   1000000000,
 }
 
 # Access keys (optional upgrade)
-ACCESS_KEY_ELEVATED = os.getenv("ACCESS_KEY_ELEVATED", "")
-ACCESS_KEY_ADMIN    = os.getenv("ACCESS_KEY_ADMIN", "")
+ACCESS_KEY_ELEVATED = os.getenv("ACCESS_KEY_ELEVATED", "elevate")
+ACCESS_KEY_ADMIN    = os.getenv("ACCESS_KEY_ADMIN", "admin")
 
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]

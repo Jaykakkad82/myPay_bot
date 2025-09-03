@@ -3,6 +3,11 @@ import ChatInput from "./components/ChatInput";
 import MessageBubble from "./components/MessageBubble";
 import { useChat } from "./hooks/useChat";
 import { health } from "./lib/api";
+import TierBadge from "./components/TierBadge";
+import UsageMeter from "./components/UsageMeter";
+import UpgradeModal from "./components/UpgradeModal";
+import LimitBanner from "./components/LimitBanner";
+import { useLimits } from "./hooks/useLimits";
 
 function StatusPill({ ok }: { ok: boolean | null }) {
   const label = ok === null ? "checking…" : ok ? "online" : "offline";
@@ -15,23 +20,47 @@ function StatusPill({ ok }: { ok: boolean | null }) {
   );
 }
 
+// Try to parse `{...}` JSON at end of "429 … – {...}"
+function parseLimitFromError(msg?: string): { reason?: string; retryAfterSec?: number } | null {
+  if (!msg) return null;
+  if (!/^429\b/.test(msg)) return null;
+  const idx = msg.indexOf("–");
+  if (idx >= 0) {
+    const maybe = msg.slice(idx + 1).trim();
+    try {
+      const obj = JSON.parse(maybe);
+      const reason = obj?.reason || obj?.detail || obj?.message;
+      const retryAfterSec = obj?.retryAfterSec ?? obj?.retry_after ?? obj?.retryAfter ?? undefined;
+      return { reason, retryAfterSec };
+    } catch {
+      // ignore
+    }
+  }
+  return { reason: msg, retryAfterSec: undefined };
+}
+
 export default function App() {
-  const { sessionId, messages, busy, error, send, clear, scrollRef, approvePending, denyPending } = useChat();
+  const { sessionId,  sessionReady,  messages, busy, error, send, clear, scrollRef, approvePending, denyPending } = useChat();
+  const { tier, limits, loading: limitsLoading, error: limitsError, refresh, upgrade, upgrading, upgradeError, setUpgradeError } = useLimits({ enabled: sessionReady });
+
   const [ok, setOk] = useState<boolean | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [limitBanner, setLimitBanner] = useState<{ reason?: string; retryAfterSec?: number } | null>(null);
 
   // Frontend-only latency (per assistant turn)
   const [sendStartedAt, setSendStartedAt] = useState<number | null>(null);
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
 
-  // Wrap send: record start timestamp locally
-  const sendWithLatency = (text: string, extras?: { customerId?: number; from?: string; to?: string; currency?: string }) => {
+  const sendWithLatency = (
+    text: string,
+    extras?: { customerId?: number; from?: string; to?: string; currency?: string }
+  ) => {
     setSendStartedAt(performance.now());
     setLastLatencyMs(null);
+    setLimitBanner(null); // clear banner on new try
     send(text, extras);
   };
 
-  // When the backend response lands (busy -> false and last message is assistant),
-  // compute the turn latency on the frontend only.
   useEffect(() => {
     if (!busy && sendStartedAt != null && messages.length > 0) {
       const last = messages[messages.length - 1];
@@ -39,15 +68,32 @@ export default function App() {
         const ms = Math.max(0, Math.round(performance.now() - sendStartedAt));
         setLastLatencyMs(ms);
         setSendStartedAt(null);
+        // refresh limits after each answer
+        refresh();
       }
     }
-  }, [busy, messages, sendStartedAt]);
+  }, [busy, messages, sendStartedAt, refresh]);
 
   useEffect(() => {
     health().then((h) => setOk(!!h.ok)).catch(() => setOk(false));
   }, []);
 
-  // Small helper: format latency nicely
+  // Parse 429 into a friendly banner
+  useEffect(() => {
+    const parsed = parseLimitFromError(error || undefined);
+    if (parsed) setLimitBanner(parsed);
+  }, [error]);
+
+  useEffect(() => {
+    if (sessionId) {
+      refresh();
+    }
+  }, [sessionId, refresh]);
+
+  useEffect(() => {
+    if (tier) setLimitBanner(null);
+  }, [tier]);
+
   const latencyLabel = useMemo(() => {
     if (lastLatencyMs == null) return null;
     if (lastLatencyMs < 1000) return `${lastLatencyMs} ms`;
@@ -55,9 +101,24 @@ export default function App() {
     return `${s}s`;
   }, [lastLatencyMs]);
 
+  const handleUpgradeSubmit = async (accessKey: string): Promise<boolean> => {
+  try {
+    // await upgrade(accessKey);          // your existing hook fn
+    // setShowUpgrade(false);             // close on success
+    // return true;                       // matches expected type
+    const ok = await upgrade(accessKey); // returns boolean
+      if (ok) {
+            setLimitBanner(null);
+            await refresh();
+            setShowUpgrade(false);
+          }
+          return ok;
+        }
+  catch (e) { return false}
+};
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-zinc-100">
-      {/* Centered container */}
       <div className="mx-auto max-w-3xl px-3 sm:px-6 py-8">
         {/* Header */}
         <header className="mb-5 flex items-center justify-between">
@@ -65,12 +126,50 @@ export default function App() {
             myPayments <span className="opacity-60">•</span>{" "}
             <span className="text-indigo-600 dark:text-indigo-300">Agent Chat</span>
           </h1>
-          <StatusPill ok={ok} />
+
+          <div className="flex items-center gap-2">
+            {/* Session badge + copy */}
+            <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] bg-white/70 dark:bg-zinc-900/60 shadow-sm">
+              <span className="font-mono">{sessionId?.slice(0, 8) || "…"}</span>
+              <button
+                onClick={() => navigator.clipboard.writeText(sessionId || "")}
+                className="opacity-70 hover:opacity-100 underline decoration-dotted"
+                title="Copy session id"
+              >
+                copy
+              </button>
+            </span>
+
+            <TierBadge tier={tier} />
+            <UsageMeter limits={limits || undefined} />
+
+            <button
+              className="text-[11px] px-3 py-1 rounded-full border hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              onClick={() => { setUpgradeError(null); setShowUpgrade(true); }}
+            >
+              Enter access key
+            </button>
+
+            <StatusPill ok={ok} />
+          </div>
         </header>
 
-        <p className="text-xs opacity-70 mb-3">
-          Session: <span className="font-mono">{sessionId}</span>
-        </p>
+        {/* Limits errors */}
+        {limitsError && (
+          <div className="mb-3 text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/30 border border-amber-300/60 dark:border-amber-900/40 rounded-xl p-2">
+            {limitsError}
+          </div>
+        )}
+
+        {/* 429 banner */}
+        {limitBanner && (
+          <LimitBanner
+            reason={limitBanner.reason}
+            retryAfterSec={limitBanner.retryAfterSec}
+            onClose={() => setLimitBanner(null)}
+            onUpgradeClick={() => { setUpgradeError(null); setShowUpgrade(true); }}
+          />
+        )}
 
         {/* Card */}
         <div className="rounded-3xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-900/70 shadow-xl backdrop-blur">
@@ -116,20 +215,32 @@ export default function App() {
             )}
           </div>
 
-          {/* Divider with soft shadow */}
+          {/* Divider */}
           <div className="h-px bg-zinc-200/80 dark:bg-zinc-800/80 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.12)] dark:shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.5)]" />
 
-          {/* Input (subtle sticky feel + gradient top) */}
+          {/* Input */}
           <div className="p-3 sm:p-4 bg-gradient-to-t from-white/95 via-white/75 to-transparent dark:from-zinc-900/95 dark:via-zinc-900/60 rounded-b-3xl">
-            {error && <div className="text-xs text-rose-600 mb-2">{error}</div>}
+            {/* keep generic errors here too (non-429) */}
+            {error && !/^429\b/.test(error) && (
+              <div className="text-xs text-rose-600 mb-2">{error}</div>
+            )}
             <ChatInput disabled={busy} onSend={sendWithLatency} />
             <div className="mt-2 flex items-center justify-between text-[11px] opacity-70">
               <button onClick={clear} className="hover:opacity-100">Clear</button>
-              <span>Tip: use YYYY-MM-DD; dates are normalized to full ISO.</span>
+              <span>{limitsLoading ? "loading limits…" : "Tip: use YYYY-MM-DD; dates are normalized to full ISO."}</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Upgrade modal */}
+      <UpgradeModal
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        onSubmit={handleUpgradeSubmit}
+        loading={upgrading}
+        error={upgradeError}
+      />
     </div>
   );
 }

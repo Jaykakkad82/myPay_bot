@@ -4,6 +4,11 @@ import {
   sendChat,
   approve as apiApprove,
   deny as apiDeny,
+  startSession,
+  getSessionId,
+  setSessionId,
+  clearSessionId,
+  ApiError,
   type AssistantMessage,
   type TraceStep,
   type ToolCall,
@@ -23,7 +28,7 @@ export interface Message {
 }
 
 export interface ChatOptions {
-  initialSessionId?: string;
+  initialSessionId?: string; // kept for compatibility with your UI
   defaultCustomerId?: number;
 }
 
@@ -36,19 +41,50 @@ export function useChat(opts?: ChatOptions) {
   // Store the latest resume blob from backend for approval resume
   const lastStateRef = useRef<any>(null);
 
-  const sessionId = useMemo(() => {
-    const fromStore =
-      opts?.initialSessionId || localStorage.getItem("mp_session_id");
-    if (fromStore) return fromStore;
-    const sid = uuid();
-    localStorage.setItem("mp_session_id", sid);
+  // ---- Server session management ----
+  const [sessionId, setSessionIdState] = useState<string | null>(null);
+  const [bootstrapping, setBootstrapping] = useState<boolean>(true);
+
+  // Ensure a server session exists (create if missing)
+  async function ensureSession(): Promise<string> {
+    let sid = getSessionId();
+    if (!sid && opts?.initialSessionId) {
+      // allow an externally provided id (rare)
+      console.log("Using externally provided session ID:", opts.initialSessionId);
+      sid = opts.initialSessionId;
+      setSessionId(sid);
+    }
+    if (!sid) {
+      console.log("No session, starting a new one...");
+      const s = await startSession();
+      console.log("New session started:", s.sessionId);
+      sid = s.sessionId;
+    }
+    setSessionIdState(sid);
     return sid;
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await ensureSession();
+      } catch (e: any) {
+        setError(e?.message || "Failed to start session.");
+      } finally {
+        setBootstrapping(false);
+      }
+    })();
   }, [opts?.initialSessionId]);
 
+  // Keep scroll pinned to bottom on new messages
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 1e9, behavior: "smooth" });
   }, [messages.length]);
 
+  const sessionReady = !!(sessionId || getSessionId()) && !bootstrapping;
+
+
+  // ---- Chat send with one-time 401 retry ----
   async function send(
     text: string,
     extras?: { customerId?: number; from?: string; to?: string; currency?: string }
@@ -65,13 +101,31 @@ export function useChat(opts?: ChatOptions) {
     setMessages((m) => [...m, userMsg]);
     setBusy(true);
 
-    try {
-      const res: AssistantMessage = await sendChat(text, {
+    const doSend = async () =>
+      await sendChat(text, {
         customerId: extras?.customerId,
         from: extras?.from,
         to: extras?.to,
         currency: extras?.currency,
       });
+
+    try {
+      // make sure session exists
+      if (!sessionId) await ensureSession();
+
+      let res: AssistantMessage;
+      try {
+        res = await doSend();
+      } catch (err: any) {
+        if (err instanceof ApiError && err.status === 401) {
+          // bootstrap a new session & retry once
+          await startSession();
+          setSessionIdState(getSessionId());
+          res = await doSend();
+        } else {
+          throw err;
+        }
+      }
 
       // keep resume blob
       lastStateRef.current = res.resume ?? null;
@@ -101,7 +155,7 @@ export function useChat(opts?: ChatOptions) {
     }
   }
 
-  // Approve/deny helpers (use lastStateRef)
+  // ---- Approve/deny with 401 retry ----
   async function approvePending(approvalId: string) {
     if (!approvalId || !lastStateRef.current) {
       setError("Nothing to approve.");
@@ -109,8 +163,19 @@ export function useChat(opts?: ChatOptions) {
     }
     setBusy(true);
     try {
-      const res = await apiApprove(approvalId, lastStateRef.current);
-      // update resume for possible chained approvals
+      const tryApprove = () => apiApprove(approvalId, lastStateRef.current);
+      let res: AssistantMessage;
+      try {
+        res = await tryApprove();
+      } catch (err: any) {
+        if (err instanceof ApiError && err.status === 401) {
+          await startSession();
+          setSessionIdState(getSessionId());
+          res = await tryApprove();
+        } else {
+          throw err;
+        }
+      }
       lastStateRef.current = res.resume ?? lastStateRef.current;
 
       const botMsg: Message = {
@@ -137,7 +202,20 @@ export function useChat(opts?: ChatOptions) {
     }
     setBusy(true);
     try {
-      const res = await apiDeny(approvalId, lastStateRef.current);
+      const tryDeny = () => apiDeny(approvalId, lastStateRef.current);
+      let res: AssistantMessage;
+      try {
+        res = await tryDeny();
+      } catch (err: any) {
+        if (err instanceof ApiError && err.status === 401) {
+          await startSession();
+          setSessionIdState(getSessionId());
+          res = await tryDeny();
+        } else {
+          throw err;
+        }
+      }
+
       const botMsg: Message = {
         id: res.id || uuid(),
         role: "assistant",
@@ -161,14 +239,14 @@ export function useChat(opts?: ChatOptions) {
   }
 
   return {
-    sessionId,
+    sessionId: sessionId || getSessionId() || "",
+    sessionReady,
     messages,
-    busy,
+    busy: busy || bootstrapping,
     error,
     send,
     clear,
     scrollRef,
-    // expose approval actions + state for consumers
     approvePending,
     denyPending,
     lastStateRef,

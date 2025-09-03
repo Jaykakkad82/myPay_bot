@@ -44,7 +44,7 @@ def _approx_tokens(*texts: str) -> int:
             total += len(t)
         else:
             total += len(str(t))
-    return max(1, total // 4)
+    return max(1, total // 2)*4. # average 4 llm calls per request
 
 
 def _compact_history_by_chars(messages: List[Dict[str, Any]], max_chars: int = 8000) -> List[Dict[str, Any]]:
@@ -136,7 +136,22 @@ async def chat(body: ChatIn, request: Request):
         "tool_calls": [],
         "extras": body.extras or {},
     }
-    state = await graph.ainvoke(initial)
+
+    try:
+        from langchain_community.callbacks.manager import aget_openai_callback
+    except Exception:
+        aget_openai_callback = None
+
+    if aget_openai_callback is not None:
+        async with aget_openai_callback() as cb:
+            state = await graph.ainvoke(initial)
+        real_tokens = int(getattr(cb, "total_tokens", 0) or 0)
+    else:
+        state = await graph.ainvoke(initial)
+        real_tokens = 0  # fallback
+
+
+    # state = await graph.ainvoke(initial)
 
     # --- Enforce tool-call and token limits after execution (so we have counts) ---
     tool_calls = state.get("tool_calls") or []
@@ -147,10 +162,14 @@ async def chat(body: ChatIn, request: Request):
 
     # Approx tokens for this turn: input + assistant content
     msg = _format_message_from_state(state)
-    approx = _approx_tokens(body.message, msg["content"])
-    ok, meta = SessionStore.enforce_tokens(sid, approx)
+    tokens_to_charge = int(real_tokens or _approx_tokens(body.message, msg["content"]))
+    ok, meta = SessionStore.enforce_tokens(sid, tokens_to_charge)
     if not ok:
         raise HTTPException(status_code=429, detail=meta)
+    # approx = _approx_tokens(body.message, msg["content"])
+    # ok, meta = SessionStore.enforce_tokens(sid, approx)
+    # if not ok:
+    #     raise HTTPException(status_code=429, detail=meta)
 
     # --- Persist assistant turn in session memory ---
     SessionMemory.append(sid, role="assistant", content=msg["content"])
