@@ -42,6 +42,7 @@ graph TD;
   DATA --> MCP[MCP Server];
   EXEC --> MCP;
   MCP --> SB[Spring Boot API];
+  SB --> APPDB [PostgreSQL or mySQL];
   ORCH --> SUM[Summarizer];
   DATA --> SUM;
   EXEC --> SUM;
