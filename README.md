@@ -31,45 +31,28 @@ A production-leaning **agentic demo** for API products. It showcases:
 ## 🏗️ Architecture (High Level)
 
 ```mermaid
-flowchart LR
-  U[User] --> FE[frontEnd (React)]
+graph TD
+  U[User] --> FE[FrontEnd (React)]
   FE --> API[agent_multi (FastAPI)]
-
-  subgraph Agentic Core
-    ORCH[orchestrator (planner)]
-    DATA[data_agent (read-only tools)]
-    EXEC[execution_agent (write tools)]
-    COMP[compliance gate]
-    NOTE[notifier (SES SMTP)]
-    SUM[summarizer (tables + follow-ups)]
-  end
-
-  API --> ORCH
-  ORCH -->|plan of steps| DATA
-  ORCH -->|plan of steps| COMP
-  COMP -->|approved| EXEC
-  EXEC --> NOTE
+  API --> ORCH[Orchestrator]
+  ORCH --> DATA[Data Agent]
+  ORCH --> EXEC[Execution Agent]
+  EXEC --> COMP[Compliance]
+  EXEC --> NOTIF[Notifier (SES)]
+  DATA --> MCP[MCP Server]
+  EXEC --> MCP
+  MCP --> SB[Spring Boot API]
+  ORCH --> SUM[Summarizer]
   DATA --> SUM
   EXEC --> SUM
-
-  subgraph Integrations
-    MCP[MCP server]
-    SB[Spring Boot API]
-    DDB[(DynamoDB)]
-  end
-
-  DATA --> MCP
-  EXEC --> MCP
-  MCP --> SB
-
-  FE -->|X-Session-Id| API
-  API <--> DDB
+  API --> DDB[(DynamoDB)]
+  FE -.-> DDB
 
   classDef dim fill:#f6f6f7,stroke:#d1d5db,color:#111;
   classDef core fill:#eef2ff,stroke:#818cf8,color:#111;
   classDef integ fill:#ecfeff,stroke:#06b6d4,color:#111;
   class API,FE dim;
-  class ORCH,DATA,EXEC,COMP,NOTE,SUM core;
+  class ORCH,DATA,EXEC,COMP,NOTIF,SUM core;
   class MCP,SB,DDB integ;
 ```
 
