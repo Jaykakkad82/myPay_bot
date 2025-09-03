@@ -1,57 +1,96 @@
-# myPayments • LLM Agents for API Products (Demo)
+# myPayments • Agentic API Demo
 
-A full demo showcasing an **agentic orchestration pattern** over an API product.  
-It includes:
+<p align="left">
+  <img alt="status" src="https://img.shields.io/badge/status-active-22c55e" />
+  <img alt="python" src="https://img.shields.io/badge/Python-3.11+-3776AB" />
+  <img alt="node" src="https://img.shields.io/badge/Node-18+-43853d" />
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-000" />
+</p>
 
-- Two assistants: **single-agent** and **multi-agent** (LangGraph-based)  
-- A **Spring Boot payments API** (customers, transactions, payments)  
-- An **MCP server** that exposes the API as tools  
-- A **React chat UI**  
-- **Server-side sessions, access tiers, and usage limits** backed by DynamoDB (or DynamoDB Local)  
-- Optional **email notifications** via Amazon SES SMTP for write events  
+A production-leaning **agentic demo** for API products. It showcases:
+- **Multi‑agent orchestration** (LangGraph) vs **single agent** baseline
+- **MCP server** wrapping a Spring Boot API (customers / transactions / payments)
+- **Front‑end chat UI** with session limits, access tiers, and approval flow
+- Optional **notifier** via SMTP/SES (email on write events)
 
 ---
 
-## 📂 What’s Inside
+## 🧭 What’s Inside
 
+```
 .
-├── agent_multi/ # LangGraph multi-agent (orchestrator, data, execution, compliance, notifier, summarizer)
-├── agent/ # Single-agent baseline (for comparison/testing)
-├── mcpServer/ # MCP server that wraps the Spring Boot API as tools
-├── frontEnd/ # Vite + React + Tailwind chat UI
-└── myPayment/ # Spring Boot API (customers/transactions/payments)
-
-
----
-
-## 🏗 Architecture (High Level)
-
-User → frontEnd (React) → agent_multi (FastAPI)
-
-orchestrator (planner) → plan of steps
-├── data_agent (read-only tools)
-├── execution_agent (write tools) → optional notifier (SES email)
-└── summarizer (renders tables + follow-ups)
-
-Agents → MCP server → Spring Boot API
-
-Session + limits → DynamoDB (session profile + usage windows)
-
-UI → X-Session-Id to bind requests to server-side session
-
+├── agent_multi/    # LangGraph multi-agent (orchestrator, data, execution, compliance, notifier, summarizer)
+├── agent/          # Single-agent baseline (for comparison/testing)
+├── mcpServer/      # MCP server that wraps the Spring Boot API
+├── frontEnd/       # Vite + React + Tailwind chat UI
+└── myPayment/      # Spring Boot API (customers/transactions/payments)
+```
 
 ---
 
-## ⚡ Quick Start (Local)
+## 🏗️ Architecture (High Level)
 
-### Prerequisites
-- Node 18+  
-- Java 17+  
-- Python 3.11  
-- Docker (for DynamoDB Local)  
-- AWS CLI (optional, for local setup)  
+```mermaid
+flowchart LR
+  U[User] --> FE[frontEnd (React)]
+  FE --> API[agent_multi (FastAPI)]
 
-### 1. Run DynamoDB Local
+  subgraph Agentic Core
+    ORCH[orchestrator (planner)]
+    DATA[data_agent (read-only tools)]
+    EXEC[execution_agent (write tools)]
+    COMP[compliance gate]
+    NOTE[notifier (SES SMTP)]
+    SUM[summarizer (tables + follow-ups)]
+  end
+
+  API --> ORCH
+  ORCH -->|plan of steps| DATA
+  ORCH -->|plan of steps| COMP
+  COMP -->|approved| EXEC
+  EXEC --> NOTE
+  DATA --> SUM
+  EXEC --> SUM
+
+  subgraph Integrations
+    MCP[MCP server]
+    SB[Spring Boot API]
+    DDB[(DynamoDB)]
+  end
+
+  DATA --> MCP
+  EXEC --> MCP
+  MCP --> SB
+
+  FE -->|X-Session-Id| API
+  API <--> DDB
+
+  classDef dim fill:#f6f6f7,stroke:#d1d5db,color:#111;
+  classDef core fill:#eef2ff,stroke:#818cf8,color:#111;
+  classDef integ fill:#ecfeff,stroke:#06b6d4,color:#111;
+  class API,FE dim;
+  class ORCH,DATA,EXEC,COMP,NOTE,SUM core;
+  class MCP,SB,DDB integ;
+```
+
+---
+
+## ✨ Features
+
+- **Agentic workflow**: Orchestrator → Data/Execution agents → Summarizer
+- **Approvals**: Compliance node requests human approval before writes
+- **Notifications**: SES/SMTP email on payment/transaction writes
+- **Sessions & limits**: X‑Session‑Id header, access tiers, per‑minute/day meters in DynamoDB
+- **Observability**: Trace chips, tool‑call viewer, frontend turn latency chip
+- **Deterministic prompts**: Zero‑temperature routing with explicit op mapping
+
+---
+
+## 🚀 Quickstart (Local)
+
+> Prereqs: Python 3.11+, Node 18+, Java 17+, Docker (for DynamoDB Local), AWS CLI v2 (optional for SES)
+
+### 1) Backend: DynamoDB Local
 ```bash
 docker run -d --name dynamodb-local -p 8000:8000 amazon/dynamodb-local
 
@@ -66,67 +105,101 @@ aws dynamodb update-time-to-live \
   --endpoint-url http://localhost:8000 \
   --table-name mp-runtime \
   --time-to-live-specification '{"Enabled":true,"AttributeName":"expiresAt"}'
-  ```
+```
 
-###  2. Start Spring Boot API
+Set env for local endpoint:
+```bash
+export AWS_REGION=us-east-1
+export DDB_TABLE=mp-runtime
+export DDB_ENDPOINT=http://localhost:8000
+```
+
+### 2) Spring Boot API (myPayment)
 ```bash
 cd myPayment
-./mvnw spring-boot:run   # runs on http://localhost:8080
+./mvnw spring-boot:run
+# API default: http://localhost:8080
 ```
 
-### 3. Start MCP Server
+### 3) MCP Server
 ```bash
 cd mcpServer
-# configure API base URL in env (see folder README)
-uvicorn main:app --port 12136 --reload
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app:app --reload --port 12136
+# MCP API default: http://localhost:12136
 ```
 
-### 4. Start Multi-Agent Backend
+### 4) Agentic Backends
 ```bash
 cd agent_multi
-# create .env (see folder README), then:
-uvicorn app:app --port 8010 --reload
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export OPENAI_API_KEY=...
+
+# Optional SES for email notifier
+export SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+export SMTP_USER=AKIA...
+export SMTP_PASS=xxxx
+export SMTP_PORT=587
+export SMTP_FROM=verified@yourdomain.com
+export SMTP_TO=you@yourdomain.com
+
+uvicorn main:app --reload --port 8010
+# Health: http://localhost:8010/health
 ```
 
-###  5. Start Frontend
+### 5) Frontend
 ```bash
 cd frontEnd
 npm i
-# set VITE_AGENT_API_URL=http://localhost:8010 in .env.local (optional)
-npm run dev   # http://localhost:5173
+VITE_AGENT_API_URL=http://localhost:8010 npm run dev
+# Open http://localhost:5173
 ```
 
+---
 
+## 🔐 Sessions, Tiers & Limits
 
-☁️ Deployment (AWS Outline)
+- UI calls **POST /session/start**, stores `mp_server_session_id` in localStorage
+- Every request includes **X‑Session‑Id**
+- **/session/limits** shows live meters (requests/min, tools/min, tokens/day)
+- **/session/upgrade** accepts an access key → elevated/admin tier
+- Counters & TTL windows are persisted in **DynamoDB** (per session)
 
-- API (Spring Boot): ECS/Fargate or EKS; RDS Postgres/Aurora; ALB in front
+---
 
-- MCP server: ECS service in same VPC (reach API via service discovery or internal ALB)
+## ⚙️ Configuration (env)
 
-- agent_multi: ECS service with AWS_REGION, DDB_TABLE, SMTP/SES creds, MCP_URL
+| Var | Default | Notes |
+|---|---|---|
+| `OPENAI_API_KEY` | — | LLM calls (LangChain / LangGraph) |
+| `AWS_REGION` | `us-east-1` | For DynamoDB / SES |
+| `DDB_TABLE` | `mp-runtime` | Session & usage store |
+| `DDB_ENDPOINT` | *(unset)* | Set to `http://localhost:8000` for local |
+| `SMTP_HOST` | — | SES SMTP endpoint |
+| `SMTP_USER` / `SMTP_PASS` | — | SMTP creds |
+| `SMTP_FROM` / `SMTP_TO` | — | Verified SES identities |
 
-- DynamoDB: Managed DynamoDB (no endpoint override, TTL enabled)
+---
 
-- SES SMTP: Verify sender/recipient in sandbox; port 587 (STARTTLS)
+## 🧪 Try These
 
-- frontEnd: S3 + CloudFront or any static host; configure VITE_AGENT_API_URL
+- “Show spend for customer 1 from 2025‑07‑01 to 2025‑07‑31 in USD.”  
+- “Search transactions for customer 1 status COMPLETED.”  
+- “Create a $45 USD groceries transaction for customer 1.” *(triggers approval + email)*
 
+---
 
+## 🩺 Troubleshooting
 
-⚠️ Notes & Gotchas
+- **429 Too Many Requests:** You hit limits. Use “Enter access key,” or wait for the window to reset.  
+- **SES 530 Authentication required:** Verify `SMTP_FROM` identity; use STARTTLS on 587.  
+- **DynamoDB float error:** Use `Decimal` types (handled in code) for numeric counters.  
+- **Same session in multiple tabs:** LocalStorage is per‑origin; use Incognito or clear key `mp_server_session_id`.
 
-- DynamoDB Numbers: boto3 requires Decimal; coercion is applied where needed
+---
 
-- Reserved Attributes: use ExpressionAttributeNames (e.g., #f for counter)
+## 📄 License
 
-- Sessions: UI must call /session/start and send X-Session-Id header with every request
-
-- Limits: Windows stored as PK=SESSION#{id}, SK=WIN#{metric}#{bucket}
-
-- SES Sandbox: Both sender & recipient emails must be verified (or move account to prod)
-
-
-📜 License
-
-MIT 
+MIT — do whatever you want; attribution appreciated.
