@@ -32,20 +32,20 @@ A production-leaning **agentic demo** for API products. It showcases:
 
 ```mermaid
 graph TD;
-  U[User] --> FE[FrontEnd (React)];
-  FE --> API[agent_multi (FastAPI)];
+  U[User] --> FE[FrontEnd React];
+  FE --> API[agent_multi FastAPI];
   API --> ORCH[Orchestrator];
   ORCH --> DATA[Data Agent];
   ORCH --> EXEC[Execution Agent];
   EXEC --> COMP[Compliance];
-  EXEC --> NOTIF[Notifier (SES)];
+  EXEC --> NOTIF[Notifier SES];
   DATA --> MCP[MCP Server];
   EXEC --> MCP;
   MCP --> SB[Spring Boot API];
   ORCH --> SUM[Summarizer];
   DATA --> SUM;
   EXEC --> SUM;
-  API --> DDB[(DynamoDB)];
+  API --> DDB[DynamoDB];
   FE -.-> DDB;
 
   classDef dim fill:#f6f6f7,stroke:#d1d5db,color:#111;
