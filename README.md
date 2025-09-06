@@ -67,8 +67,29 @@ graph TD;
 - **Sessions & limits**: X‑Session‑Id header, access tiers, per‑minute/day meters in DynamoDB
 - **Observability**: Trace chips, tool‑call viewer, frontend turn latency chip
 - **Deterministic prompts**: Zero‑temperature routing with explicit op mapping
-
 ---
+
+### Screenshots
+<p align="center">
+  <a href="docs/img/lookAndFeel.png">
+    <img src="docs/img/lookAndFeel.png" alt="Chat with trace chips" width="48%">
+  </a>
+</p>
+
+<p align="center"><sub>Chat UI Session management with limits for each access tiers</sub></p>
+
+
+<p align="center">
+  <a href="docs/img/traceAndToolTip.png">
+    <img src="docs/img/traceAndToolTip.png" alt="Chat with trace chips" width="48%">
+  </a>
+  <a href="docs/img/approvalRoute.png">
+    <img src="docs/img/approvalRoute.png" alt="Approval banner" width="48%">
+  </a>
+</p>
+
+<p align="center"><sub>Left: Chat UI with trace chips • Right: Approval banner before write</sub></p>
+
 
 ## 🚀 Quickstart (Local)
 
@@ -187,3 +208,6 @@ VITE_AGENT_API_URL=http://localhost:8010 npm run dev
 ## 📄 License
 
 MIT — do whatever you want; attribution appreciated.
+
+<p align="center"><small>© 2025 Jaykumar Kakkad</small></p>
+

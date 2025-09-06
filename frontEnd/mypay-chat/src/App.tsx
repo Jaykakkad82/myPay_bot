@@ -7,6 +7,7 @@ import TierBadge from "./components/TierBadge";
 import UsageMeter from "./components/UsageMeter";
 import UpgradeModal from "./components/UpgradeModal";
 import LimitBanner from "./components/LimitBanner";
+import Footer from "./components/footer";
 import { useLimits } from "./hooks/useLimits";
 
 function StatusPill({ ok }: { ok: boolean | null }) {
@@ -19,6 +20,7 @@ function StatusPill({ ok }: { ok: boolean | null }) {
     </span>
   );
 }
+
 
 // Try to parse `{...}` JSON at end of "429 … – {...}"
 function parseLimitFromError(msg?: string): { reason?: string; retryAfterSec?: number } | null {
@@ -117,8 +119,10 @@ export default function App() {
   catch (e) { return false}
 };
 
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-sky-50 via-white to-indigo-50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-zinc-100">
+      <main className="flex-1">
       <div className="mx-auto max-w-3xl px-3 sm:px-6 py-8">
         {/* Header */}
         <header className="mb-5 flex items-center justify-between">
@@ -232,6 +236,9 @@ export default function App() {
           </div>
         </div>
       </div>
+      </main>
+
+      <Footer />
 
       {/* Upgrade modal */}
       <UpgradeModal

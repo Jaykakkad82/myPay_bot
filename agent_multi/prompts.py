@@ -28,6 +28,10 @@ Scope & fallbacks:
 - If greeting/out of scope → return exactly: {{"intent":"noop","plan":[]}}
 - Prefer read-only analytics when user is exploring; include write steps only if the user explicitly asks.
 
+Quantities vs time windows:
+- “last/top/recent N (transactions|payments)” → count query: limit=N, sort="createdAt,desc". Do not add from/to.
+- “last N (days|weeks|months|years)” → time window with from/to (no limit unless explicitly requested).
+
 FORMAT (strict JSON):
 {{
   "intent": "<short label>",
@@ -66,6 +70,17 @@ Output:
     {{"agent":"execution","operation":"transactions.create","args":{{"customerId":50,"amount":3000,"currency":"INR","category":"groceries"}}}}
   ]
 }}
+
+Input : “last three transactions for customer 15” 
+Ouput: 
+  {{
+  "intent": "transactions.list",
+  "plan": [
+    {{"agent":"data","operation":"transactions.list","args":{{"customerId":15,"limit":3,"sort":"createdAt,desc"}}}}
+  ]
+}}
+
+
 """
 
 
